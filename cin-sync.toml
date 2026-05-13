@@ -1,0 +1,41 @@
+# CIN Sync Daemon config
+
+[identity]
+name = "raz-gpd4"
+role = "mobile"  # "mobile" or "hub"
+
+[peer]
+name = "raz-thinkhub"
+tailscale_ip = "100.123.55.83"
+ssh_user = "raz"
+poll_interval_secs = 15
+
+[sync]
+# Bidirectional sync dirs — small files, memory, config
+paths = [
+    { local = "~/CIN", remote = "~/CIN", direction = "bidirectional" },
+    { local = "~/.claude/projects/-home-raz/memory", remote = "~/.claude/projects/-home-raz/memory", direction = "bidirectional" },
+]
+
+[offload]
+# One-way GPD → thinkhub offload rules
+vault_path = "~/vault/ingest"
+delete_after_send = true
+min_size_mb = 20480
+
+# File patterns to always offload regardless of size
+always_offload = ["*.gguf", "*.safetensors", "*.tar.zst"]
+
+# Watch these dirs for offload candidates
+watch_dirs = ["~/tmp", "~/projects"]
+
+# Never offload these
+exclude = [".git", "node_modules", "target", "venv", "__pycache__"]
+
+[hooks]
+# Run on peer connect
+on_connect = []
+# Run on peer disconnect
+on_disconnect = []
+# Run after sync completes
+on_sync_done = []
