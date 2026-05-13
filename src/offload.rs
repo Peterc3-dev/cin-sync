@@ -71,15 +71,29 @@ pub async fn offload_file(
     vault_path: &str,
     delete_after: bool,
 ) -> anyhow::Result<()> {
-    let local_hash = hash_file(&file.path)?;
+    let local_hash = tokio::task::spawn_blocking({
+        let path = file.path.clone();
+        move || hash_file(&path)
+    })
+    .await??;
     let vault = expand_tilde(vault_path);
     let remote_vault = vault.to_string_lossy();
+
+    let home = dirs::home_dir().expect("cannot determine home directory");
+    let relative = file
+        .path
+        .strip_prefix(&home)
+        .unwrap_or(&file.path);
+    let remote_dir = format!(
+        "{remote_vault}/{}",
+        relative.parent().map(|p| p.to_string_lossy()).unwrap_or_default()
+    );
     let filename = file
         .path
         .file_name()
         .ok_or_else(|| anyhow::anyhow!("no filename: {}", file.path.display()))?
         .to_string_lossy();
-    let remote_file = format!("{remote_vault}/{filename}");
+    let remote_file = format!("{remote_dir}/{filename}");
 
     info!(
         "offloading {} ({:.1} MB, {})",
@@ -92,7 +106,7 @@ pub async fn offload_file(
         &file.path.to_string_lossy(),
         remote_user,
         remote_ip,
-        &remote_vault,
+        &remote_dir,
     )
     .await?;
 

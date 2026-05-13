@@ -40,6 +40,8 @@ fn default_poll() -> u64 {
 #[derive(Debug, Deserialize)]
 pub struct SyncConfig {
     pub paths: Vec<SyncPath>,
+    #[serde(default)]
+    pub exclude: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -57,7 +59,7 @@ pub enum SyncDirection {
     Pull,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct OffloadConfig {
     pub vault_path: String,
     #[serde(default = "default_true")]

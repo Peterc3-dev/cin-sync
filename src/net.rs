@@ -32,14 +32,17 @@ pub async fn rsync_push(
     remote_ip: &str,
     remote_path: &str,
     excludes: &[String],
+    delete: bool,
 ) -> anyhow::Result<()> {
     let dest = format!("{remote_user}@{remote_ip}:{remote_path}");
     let mut args = vec![
         "-avz".to_string(),
-        "--delete".to_string(),
         "-e".to_string(),
         "ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10".to_string(),
     ];
+    if delete {
+        args.push("--delete".to_string());
+    }
     for exc in excludes {
         args.push("--exclude".to_string());
         args.push(exc.clone());
@@ -123,7 +126,7 @@ pub async fn scp_file(
 
     let output = Command::new("rsync")
         .args([
-            "-avz", "--progress",
+            "-avz", "--partial", "--progress",
             "-e", "ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10",
             local_file,
             &dest,

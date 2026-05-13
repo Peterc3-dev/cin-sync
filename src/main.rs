@@ -83,7 +83,7 @@ async fn main() -> anyhow::Result<()> {
 }
 
 async fn run_sync(config: &Config) -> anyhow::Result<()> {
-    let excludes = &config.offload.exclude;
+    let excludes = &config.sync.exclude;
 
     for sp in &config.sync.paths {
         let local = sp.expand_local();
@@ -94,24 +94,8 @@ async fn run_sync(config: &Config) -> anyhow::Result<()> {
             continue;
         }
 
-        match sp.direction {
-            SyncDirection::Push | SyncDirection::Bidirectional => {
-                info!("pushing {} → {}", local_str, sp.remote);
-                if let Err(e) = net::rsync_push(
-                    &local_str,
-                    &config.peer.ssh_user,
-                    &config.peer.tailscale_ip,
-                    &sp.remote,
-                    excludes,
-                )
-                .await
-                {
-                    error!("push failed for {local_str}: {e}");
-                }
-            }
-            _ => {}
-        }
-
+        // Bidirectional: pull first so remote-only files arrive before push.
+        // Push never uses --delete on bidirectional to avoid destroying remote-only files.
         match sp.direction {
             SyncDirection::Pull | SyncDirection::Bidirectional => {
                 info!("pulling {} ← {}", local_str, sp.remote);
@@ -129,13 +113,51 @@ async fn run_sync(config: &Config) -> anyhow::Result<()> {
             }
             _ => {}
         }
+
+        match sp.direction {
+            SyncDirection::Push => {
+                info!("pushing {} → {} (with delete)", local_str, sp.remote);
+                if let Err(e) = net::rsync_push(
+                    &local_str,
+                    &config.peer.ssh_user,
+                    &config.peer.tailscale_ip,
+                    &sp.remote,
+                    excludes,
+                    true,
+                )
+                .await
+                {
+                    error!("push failed for {local_str}: {e}");
+                }
+            }
+            SyncDirection::Bidirectional => {
+                info!("pushing {} → {}", local_str, sp.remote);
+                if let Err(e) = net::rsync_push(
+                    &local_str,
+                    &config.peer.ssh_user,
+                    &config.peer.tailscale_ip,
+                    &sp.remote,
+                    excludes,
+                    false,
+                )
+                .await
+                {
+                    error!("push failed for {local_str}: {e}");
+                }
+            }
+            _ => {}
+        }
     }
 
     Ok(())
 }
 
 async fn run_offload(config: &Config) -> anyhow::Result<()> {
-    let candidates = offload::scan_candidates(&config.offload);
+    let offload_config = config.offload.clone();
+    let candidates = tokio::task::spawn_blocking(move || {
+        offload::scan_candidates(&offload_config)
+    })
+    .await?;
 
     if candidates.is_empty() {
         info!("no offload candidates found");

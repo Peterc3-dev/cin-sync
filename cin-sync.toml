@@ -16,6 +16,7 @@ paths = [
     { local = "~/CIN", remote = "~/CIN", direction = "bidirectional" },
     { local = "~/.claude/projects/-home-raz/memory", remote = "~/.claude/projects/-home-raz/memory", direction = "bidirectional" },
 ]
+exclude = [".git", "node_modules", "__pycache__"]
 
 [offload]
 # One-way GPD → thinkhub offload rules
